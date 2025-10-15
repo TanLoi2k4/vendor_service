@@ -29,6 +29,16 @@ public class Vendor {
     @Column(unique = true, nullable = false, length = 100)
     private String email;
 
+    @NotBlank(message = "First name is required")
+    @Size(min = 1, max = 50, message = "First name must be between 1 and 50 characters")
+    @Column(nullable = false, length = 50)
+    private String firstName;
+
+    @NotBlank(message = "Last name is required")
+    @Size(min = 1, max = 50, message = "Last name must be between 1 and 50 characters")
+    @Column(nullable = false, length = 50)
+    private String lastName;
+
     @NotBlank(message = "Shop name is required")
     @Size(min = 3, max = 100, message = "Shop name must be between 3 and 100 characters")
     @Column(nullable = false, length = 100)

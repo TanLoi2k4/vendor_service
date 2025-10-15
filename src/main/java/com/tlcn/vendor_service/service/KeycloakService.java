@@ -4,6 +4,7 @@ import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.AccessTokenResponse;
 import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,17 +41,20 @@ public class KeycloakService {
     @Qualifier("keycloakAdmin")
     private Keycloak keycloak;
 
-    public String createUser(String username, String email, String password) {
-        logger.debug("Creating user in Keycloak: username={}, email={}", username, email);
+    public String createUser(String username, String email, String firstName, String lastName, String password) {
+        logger.debug("Creating user in Keycloak: username={}, email={}, firstName={}, lastName={}", 
+                    username, email, firstName, lastName);
 
+        // 1. Tạo user representation
         UserRepresentation user = new UserRepresentation();
         user.setUsername(username);
         user.setEmail(email);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
         user.setEnabled(true);
         user.setEmailVerified(true);
-        user.setRealmRoles(Collections.singletonList("VENDOR"));
-        user.setRequiredActions(Collections.emptyList()); // Xóa required actions
 
+        // 2. Set mật khẩu
         CredentialRepresentation credential = new CredentialRepresentation();
         credential.setType(CredentialRepresentation.PASSWORD);
         credential.setValue(password);
@@ -59,19 +63,33 @@ public class KeycloakService {
 
         UsersResource usersResource = keycloak.realm(realm).users();
         Response response = usersResource.create(user);
+
+        // 3. Check kết quả tạo user
         if (response.getStatus() != 201) {
             String errorMessage = response.readEntity(String.class);
             logger.error("Failed to create user: status={}, message={}", response.getStatus(), errorMessage);
             throw new RuntimeException("Failed to create user in Keycloak: " + errorMessage);
         }
-        String keycloakId = response.getLocation().getPath().replaceAll(".*/users/", "");
-        logger.info("User created: keycloakId={}", keycloakId);
 
-        // Kiểm tra trạng thái tài khoản
+        // 4. Lấy userId từ response
+        String keycloakId = response.getLocation().getPath().replaceAll(".*/users/", "");
+        logger.info("User created: keycloakId={}, firstName={}, lastName={}", keycloakId, firstName, lastName);
+
+        // 5. Assign role VENDOR
+        try {
+            RoleRepresentation vendorRole = keycloak.realm(realm).roles().get("VENDOR").toRepresentation();
+            usersResource.get(keycloakId).roles().realmLevel().add(Collections.singletonList(vendorRole));
+            logger.info("Assigned role VENDOR to user: {}", username);
+        } catch (Exception e) {
+            logger.error("Failed to assign role VENDOR to user {}: {}", username, e.getMessage());
+            throw new RuntimeException("User created but failed to assign role VENDOR: " + e.getMessage());
+        }
+
+        // 6. Verify user setup
         UserRepresentation createdUser = usersResource.get(keycloakId).toRepresentation();
         if (!createdUser.isEnabled() || !createdUser.isEmailVerified()) {
             logger.error("User created but not fully set up: enabled={}, emailVerified={}", 
-                         createdUser.isEnabled(), createdUser.isEmailVerified());
+                        createdUser.isEnabled(), createdUser.isEmailVerified());
             throw new RuntimeException("User created but not fully set up in Keycloak");
         }
 
@@ -92,7 +110,6 @@ public class KeycloakService {
     public AccessTokenResponse authenticateUser(String username, String password) {
         logger.debug("Authenticating user: username={}", username);
 
-        // Kiểm tra trạng thái tài khoản
         String keycloakId = getKeycloakIdByUsername(username);
         if (keycloakId == null) {
             logger.error("User not found in Keycloak: username={}", username);
@@ -137,15 +154,18 @@ public class KeycloakService {
         logger.info("Password updated for keycloakId={}", keycloakId);
     }
 
-    public void updateUser(String keycloakId, String username, String email) {
-        logger.debug("Updating user: keycloakId={}, username={}, email={}", keycloakId, username, email);
+    public void updateUser(String keycloakId, String username, String email, String firstName, String lastName) {
+        logger.debug("Updating user: keycloakId={}, username={}, email={}, firstName={}, lastName={}", 
+                     keycloakId, username, email, firstName, lastName);
         UserRepresentation user = keycloak.realm(realm).users().get(keycloakId).toRepresentation();
         user.setUsername(username);
         user.setEmail(email);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
         user.setEmailVerified(true);
         user.setRequiredActions(Collections.emptyList());
         keycloak.realm(realm).users().get(keycloakId).update(user);
-        logger.info("User updated: keycloakId={}", keycloakId);
+        logger.info("User updated: keycloakId={}, firstName={}, lastName={}", keycloakId, firstName, lastName);
     }
 
     public String getKeycloakIdByUsername(String username) {

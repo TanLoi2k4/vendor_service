@@ -1,7 +1,6 @@
 package com.tlcn.vendor_service.config;
 
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;

@@ -1,3 +1,4 @@
+// VendorController.java
 package com.tlcn.vendor_service.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -8,6 +9,7 @@ import com.tlcn.vendor_service.service.VendorService;
 import org.keycloak.representations.AccessTokenResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,6 +37,12 @@ public class VendorController {
     public ResponseEntity<ResponseDTO<Void>> resendOtp(@RequestParam String email, @RequestParam String initToken) {
         vendorService.resendOtp(email, initToken);
         return ResponseEntity.ok(new ResponseDTO<>(true, "OTP resent", null));
+    }
+
+    @PostMapping("/forget-password/resend-otp")
+    public ResponseEntity<ResponseDTO<Void>> resendForgetPasswordOtp(@RequestParam String email) {
+        vendorService.resendForgetPasswordOtp(email);
+        return ResponseEntity.ok(new ResponseDTO<>(true, "Reset OTP resent", null));
     }
 
     @PostMapping("/verify-otp")
@@ -65,10 +73,21 @@ public class VendorController {
         return ResponseEntity.ok(new ResponseDTO<>(true, "Password reset successful", null));
     }
 
-    @PutMapping("/{id}/profile")
-    public ResponseEntity<ResponseDTO<Vendor>> updateProfile(@PathVariable Long id, @Valid @RequestBody VendorUpdateProfileRequest request, @RequestPart(required = false) MultipartFile logo) {
-        Vendor updated = vendorService.updateProfile(id, request, logo);
-        return ResponseEntity.ok(new ResponseDTO<>(true, "Profile updated", updated));
+    @PutMapping(value = "/{id}/profile", consumes = "multipart/form-data")
+    public ResponseEntity<ResponseDTO<Vendor>> updateProfile(
+            @PathVariable Long id,
+            @RequestPart("request") String requestJson,
+            @RequestPart(value = "logo", required = false) MultipartFile logo
+    ) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            VendorUpdateProfileRequest request = mapper.readValue(requestJson, VendorUpdateProfileRequest.class);
+            Vendor updated = vendorService.updateProfile(id, request, logo);
+            return ResponseEntity.ok(new ResponseDTO<>(true, "Profile updated", updated));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(new ResponseDTO<>(false, "Invalid request: " + e.getMessage(), null));
+        }
     }
 
     @PutMapping("/{id}/account")

@@ -144,7 +144,23 @@ public class VendorService {
         sendEmail(email, "OTP Resent", "Your new OTP is: " + otp);
         logger.info("OTP resent: email={}", email);
     }
+    
+    public void resendForgetPasswordOtp(String email) {
+        Vendor vendor = vendorRepository.findByEmail(email)
+                .orElseThrow(() -> {
+                    logger.warn("Email not found for password reset resend: {}", email);
+                    throw new CustomException("Email not found");
+                });
 
+        String existingOtp = redisTemplate.opsForValue().get("vendor:reset:otp:" + email);
+        if (existingOtp == null) {
+            logger.warn("No existing OTP for email: {}", email);
+            throw new CustomException("No existing OTP to resend");
+        }
+
+        sendEmail(email, "Resend Password Reset OTP", "Your OTP for password reset is: " + existingOtp);
+        logger.info("Resend password reset OTP: email={}", email);
+    }
     public Object verifyOtp(String email, String otp, String initToken, boolean autoRegister) {
         String storedOtp = redisTemplate.opsForValue().get("vendor:otp:" + email);
         if (!otp.equals(storedOtp)) {
@@ -186,11 +202,13 @@ public class VendorService {
             VendorRequest request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(requestJson, VendorRequest.class);
             String logoPublicId = (String) redisTemplate.opsForHash().get(initKey, "logoPublicId");
 
-            String keycloakId = keycloakService.createUser(request.getUsername(), request.getEmail(), request.getPassword());
+            String keycloakId = keycloakService.createUser(request.getUsername(), request.getEmail(), request.getFirstName(), request.getLastName(), request.getPassword());
 
             Vendor vendor = new Vendor();
             vendor.setUsername(request.getUsername());
             vendor.setEmail(request.getEmail());
+            vendor.setFirstName(request.getFirstName());
+            vendor.setLastName(request.getLastName());
             vendor.setShopName(request.getShopName());
             vendor.setAddress(request.getAddress());
             vendor.setPhone(request.getPhone());
@@ -321,6 +339,8 @@ public class VendorService {
                     return new CustomException("Vendor not found");
                 });
 
+        if (request.getFirstName() != null) vendor.setFirstName(request.getFirstName());
+        if (request.getLastName() != null) vendor.setLastName(request.getLastName());
         if (request.getShopName() != null) vendor.setShopName(request.getShopName());
         if (request.getAddress() != null) vendor.setAddress(request.getAddress());
         if (request.getPhone() != null) vendor.setPhone(request.getPhone());
@@ -349,6 +369,18 @@ public class VendorService {
         }
 
         Vendor updatedVendor = vendorRepository.save(vendor);
+
+        if (vendor.getKeycloakId() != null && 
+            (request.getFirstName() != null || request.getLastName() != null)) {
+            String currentFirstName = request.getFirstName() != null ? request.getFirstName() : vendor.getFirstName();
+            String currentLastName = request.getLastName() != null ? request.getLastName() : vendor.getLastName();
+            keycloakService.updateUser(vendor.getKeycloakId(), 
+                                       vendor.getUsername(), 
+                                       vendor.getEmail(), 
+                                       currentFirstName, 
+                                       currentLastName);
+        }
+
         logger.info("Profile updated: vendorId={}", vendorId);
         return updatedVendor;
     }
@@ -382,7 +414,7 @@ public class VendorService {
             vendor.setEmail(request.getEmail());
         }
 
-        keycloakService.updateUser(vendor.getKeycloakId(), vendor.getUsername(), vendor.getEmail());
+        keycloakService.updateUser(vendor.getKeycloakId(), vendor.getUsername(), vendor.getEmail(), vendor.getFirstName(), vendor.getLastName());
 
         if (request.getPassword() != null) {
             keycloakService.updatePassword(vendor.getKeycloakId(), request.getPassword());
