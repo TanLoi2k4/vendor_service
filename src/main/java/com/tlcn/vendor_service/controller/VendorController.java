@@ -1,4 +1,3 @@
-// VendorController.java
 package com.tlcn.vendor_service.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,6 +9,7 @@ import org.keycloak.representations.AccessTokenResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -73,16 +73,18 @@ public class VendorController {
         return ResponseEntity.ok(new ResponseDTO<>(true, "Password reset successful", null));
     }
 
-    @PutMapping(value = "/{id}/profile", consumes = "multipart/form-data")
+    @PutMapping(value = "/profile", consumes = "multipart/form-data")
+    @PreAuthorize("hasRole('VENDOR')")
     public ResponseEntity<ResponseDTO<Vendor>> updateProfile(
-            @PathVariable Long id,
             @RequestPart("request") String requestJson,
-            @RequestPart(value = "logo", required = false) MultipartFile logo
+            @RequestPart(value = "logo", required = false) MultipartFile logo,
+            Authentication authentication
     ) {
         try {
+            String keycloakId = authentication.getName(); // Get keycloakId from JWT
             ObjectMapper mapper = new ObjectMapper();
             VendorUpdateProfileRequest request = mapper.readValue(requestJson, VendorUpdateProfileRequest.class);
-            Vendor updated = vendorService.updateProfile(id, request, logo);
+            Vendor updated = vendorService.updateProfile(keycloakId, request, logo);
             return ResponseEntity.ok(new ResponseDTO<>(true, "Profile updated", updated));
         } catch (Exception e) {
             return ResponseEntity.badRequest()
@@ -90,19 +92,24 @@ public class VendorController {
         }
     }
 
-    @PutMapping("/{id}/account")
-    public ResponseEntity<ResponseDTO<Vendor>> updateAccount(@PathVariable Long id, @Valid @RequestBody VendorUpdateAccountRequest request) {
-        Vendor updated = vendorService.updateAccount(id, request);
+    @PutMapping("/account")
+    @PreAuthorize("hasRole('VENDOR')")
+    public ResponseEntity<ResponseDTO<Vendor>> updateAccount(@Valid @RequestBody VendorUpdateAccountRequest request, Authentication authentication) {
+        String keycloakId = authentication.getName(); // Get keycloakId from JWT
+        Vendor updated = vendorService.updateAccount(keycloakId, request);
         return ResponseEntity.ok(new ResponseDTO<>(true, "Account updated", updated));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ResponseDTO<Vendor>> getVendorById(@PathVariable Long id) {
-        Vendor vendor = vendorService.getVendorById(id);
+    @GetMapping
+    @PreAuthorize("hasRole('VENDOR')")
+    public ResponseEntity<ResponseDTO<Vendor>> getVendorByKeycloakId(Authentication authentication) {
+        String keycloakId = authentication.getName(); // Get keycloakId from JWT
+        Vendor vendor = vendorService.getVendorByKeycloakId(keycloakId);
         return ResponseEntity.ok(new ResponseDTO<>(true, "Vendor retrieved", vendor));
     }
 
     @PostMapping("/logout")
+    @PreAuthorize("hasRole('VENDOR')")
     public ResponseEntity<ResponseDTO<Void>> logout(@RequestHeader("Authorization") String authorizationHeader, @RequestParam String refreshToken) {
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
             throw new VendorService.CustomException("Invalid or missing Authorization header");
@@ -110,5 +117,12 @@ public class VendorController {
         String accessToken = authorizationHeader.replace("Bearer ", "");
         vendorService.logout(accessToken, refreshToken);
         return ResponseEntity.ok(new ResponseDTO<>(true, "Logout successful", null));
+    }
+
+    @GetMapping("/find-id-by-keycloak")
+    @PreAuthorize("hasAnyRole('VENDOR', 'ADMIN')")
+    public ResponseEntity<ResponseDTO<Long>> findIdByKeycloakId(@RequestParam String keycloakId) {
+        Vendor vendor = vendorService.getVendorByKeycloakId(keycloakId);
+        return ResponseEntity.ok(new ResponseDTO<>(true, "Vendor ID retrieved", vendor.getId()));
     }
 }

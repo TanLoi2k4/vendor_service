@@ -161,6 +161,7 @@ public class VendorService {
         sendEmail(email, "Resend Password Reset OTP", "Your OTP for password reset is: " + existingOtp);
         logger.info("Resend password reset OTP: email={}", email);
     }
+
     public Object verifyOtp(String email, String otp, String initToken, boolean autoRegister) {
         String storedOtp = redisTemplate.opsForValue().get("vendor:otp:" + email);
         if (!otp.equals(storedOtp)) {
@@ -227,7 +228,7 @@ public class VendorService {
             redisTemplate.delete("vendor:verify:" + email);
             redisTemplate.delete("vendor:email:init:" + email);
 
-            logger.info("Vendor registered: email={}, vendorId={}", email, savedVendor.getId());
+            logger.info("Vendor registered: email={}, keycloakId={}", email, savedVendor.getKeycloakId());
             return savedVendor;
         } catch (Exception e) {
             logger.error("Registration failed for email: {}, error: {}", email, e.getMessage());
@@ -252,7 +253,7 @@ public class VendorService {
             AccessTokenResponse token = keycloakService.authenticateUser(username, password);
             Vendor vendor = vendorRepository.findByUsername(username)
                     .orElseThrow(() -> new CustomException("Vendor not found after authentication"));
-            redisTemplate.opsForHash().put("vendor:session:" + token.getToken(), "vendorId", vendor.getId().toString());
+            redisTemplate.opsForHash().put("vendor:session:" + token.getToken(), "keycloakId", vendor.getKeycloakId());
             redisTemplate.opsForHash().put("vendor:session:" + token.getToken(), "username", username);
             redisTemplate.opsForValue().set("vendor:token:expires:" + token.getToken(), String.valueOf(token.getExpiresIn()), token.getExpiresIn(), TimeUnit.SECONDS);
             redisTemplate.expire("vendor:session:" + token.getToken(), token.getExpiresIn(), TimeUnit.SECONDS);
@@ -272,14 +273,11 @@ public class VendorService {
         }
 
         try {
-            // Blacklist access token in Redis until it expires
             long expiresInSeconds = 300; // Default to 5 minutes if token expiration not provided
             redisTemplate.opsForValue().set("vendor:token:blacklist:" + accessToken, "blacklisted", expiresInSeconds, TimeUnit.SECONDS);
 
-            // Call Keycloak to logout user (invalidate refresh token)
             keycloakService.logoutUser(refreshToken);
 
-            // Delete any session-related data in Redis (if applicable)
             redisTemplate.delete("vendor:session:" + accessToken);
 
             logger.info("Logout successful for access token: {}", accessToken);
@@ -332,10 +330,10 @@ public class VendorService {
     }
 
     @Transactional
-    public Vendor updateProfile(Long vendorId, VendorUpdateProfileRequest request, MultipartFile logo) {
-        Vendor vendor = vendorRepository.findById(vendorId)
+    public Vendor updateProfile(String keycloakId, VendorUpdateProfileRequest request, MultipartFile logo) {
+        Vendor vendor = vendorRepository.findByKeycloakId(keycloakId)
                 .orElseThrow(() -> {
-                    logger.warn("Vendor not found: vendorId={}", vendorId);
+                    logger.warn("Vendor not found: keycloakId={}", keycloakId);
                     return new CustomException("Vendor not found");
                 });
 
@@ -381,20 +379,20 @@ public class VendorService {
                                        currentLastName);
         }
 
-        logger.info("Profile updated: vendorId={}", vendorId);
+        logger.info("Profile updated: keycloakId={}", keycloakId);
         return updatedVendor;
     }
 
     @Transactional
-    public Vendor updateAccount(Long vendorId, VendorUpdateAccountRequest request) {
-        Vendor vendor = vendorRepository.findById(vendorId)
+    public Vendor updateAccount(String keycloakId, VendorUpdateAccountRequest request) {
+        Vendor vendor = vendorRepository.findByKeycloakId(keycloakId)
                 .orElseThrow(() -> {
-                    logger.warn("Vendor not found: vendorId={}", vendorId);
+                    logger.warn("Vendor not found: keycloakId={}", keycloakId);
                     return new CustomException("Vendor not found");
                 });
 
         if (!keycloakService.verifyPassword(vendor.getUsername(), request.getCurrentPassword())) {
-            logger.warn("Incorrect current password for vendorId={}", vendorId);
+            logger.warn("Incorrect current password for keycloakId={}", keycloakId);
             throw new CustomException("Current password incorrect");
         }
 
@@ -421,14 +419,14 @@ public class VendorService {
         }
 
         Vendor updatedVendor = vendorRepository.save(vendor);
-        logger.info("Account updated: vendorId={}", vendorId);
+        logger.info("Account updated: keycloakId={}", keycloakId);
         return updatedVendor;
     }
 
-    public Vendor getVendorById(Long vendorId) {
-        Vendor vendor = vendorRepository.findById(vendorId)
+    public Vendor getVendorByKeycloakId(String keycloakId) {
+        Vendor vendor = vendorRepository.findByKeycloakId(keycloakId)
                 .orElseThrow(() -> {
-                    logger.warn("Vendor not found: vendorId={}", vendorId);
+                    logger.warn("Vendor not found: keycloakId={}", keycloakId);
                     return new CustomException("Vendor not found");
                 });
         return vendor;
