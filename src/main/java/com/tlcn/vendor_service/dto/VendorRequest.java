@@ -4,9 +4,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class VendorRequest {
     @NotBlank(message = "Username is required")
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
@@ -28,9 +30,6 @@ public class VendorRequest {
     @NotBlank(message = "Shop name is required")
     @Size(min = 3, max = 100, message = "Shop name must be between 3 and 100 characters")
     private String shopName;
-
-    @Size(max = 255, message = "Address must not exceed 255 characters")
-    private String address;
 
     @Pattern(regexp = "^\\d{10}$", message = "Phone must be 10 digits")
     private String phone;

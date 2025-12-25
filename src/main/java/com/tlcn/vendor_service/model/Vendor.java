@@ -6,11 +6,13 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "vendors")
 public class Vendor {
@@ -52,10 +54,6 @@ public class Vendor {
     @Column(length = 255)
     private String logoPublicId;
 
-    @Size(max = 255, message = "Address must not exceed 255 characters")
-    @Column(length = 255)
-    private String address;
-
     @Pattern(regexp = "^\\d{10}$", message = "Phone must be 10 digits")
     @Column(length = 10)
     private String phone;
@@ -66,6 +64,9 @@ public class Vendor {
 
     @Column(updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(updatable = true)
+    private LocalDateTime updatedAt;
 
     @Size(max = 50, message = "Bank account must not exceed 50 characters")
     @Column(length = 50)

@@ -15,9 +15,6 @@ public class VendorUpdateProfileRequest {
     @Size(min = 3, max = 100, message = "Shop name must be between 3 and 100 characters")
     private String shopName;
 
-    @Size(max = 255, message = "Address must not exceed 255 characters")
-    private String address;
-
     @Pattern(regexp = "^\\d{10}$", message = "Phone must be 10 digits")
     private String phone;
 
