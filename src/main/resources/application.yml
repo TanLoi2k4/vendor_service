@@ -61,7 +61,7 @@ keycloak:
   auth-server-url: http://localhost:4321
   resource: vendor-service
   credentials:
-    secret: u4oXUAc0m0ObtAEpsyXK1bAF9O9fNDMQ
+    secret: uDUsU34IVMLRYuhgXMTyGitk7ge0I2zm
 
 logging:
   level:
@@ -88,3 +88,7 @@ management:
 
 admin-service:
   url: http://localhost:8086
+  internal-log-token: ${ADMIN_SERVICE_INTERNAL_LOG_TOKEN:dev-internal-token}
+
+product-service:
+  url: http://localhost:8082

@@ -3,12 +3,17 @@ package com.tlcn.vendor_service.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,6 +25,55 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * Handle missing multipart request parts (e.g. missing 'request' or file part).
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestPart(MissingServletRequestPartException ex) {
+        log.warn("Missing multipart part: {}", ex.getRequestPartName());
+        ErrorResponse response = new ErrorResponse(false,
+            "Missing multipart part: " + ex.getRequestPartName(),
+            "MISSING_MULTIPART_PART");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handle invalid JSON/body for @RequestPart DTO binding.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        log.warn("Request body not readable: {}", detail);
+        ErrorResponse response = new ErrorResponse(false,
+            "Invalid JSON in request: " + detail,
+            "INVALID_JSON");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Handle unsupported media types (commonly happens when multipart part 'request' is sent as application/octet-stream).
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        log.warn("Unsupported media type: {}", ex.getContentType());
+        ErrorResponse response = new ErrorResponse(false,
+            "Unsupported media type: " + ex.getContentType() + ". For multipart DTO binding, send part 'request' as application/json.",
+            "UNSUPPORTED_MEDIA_TYPE");
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(response);
+    }
+
+    /**
+     * Handle multipart parsing errors and upload limits.
+     */
+    @ExceptionHandler({MultipartException.class, MaxUploadSizeExceededException.class})
+    public ResponseEntity<ErrorResponse> handleMultipartErrors(Exception ex) {
+        log.warn("Multipart error: {}", ex.getMessage());
+        ErrorResponse response = new ErrorResponse(false,
+            "Multipart request error: " + ex.getMessage(),
+            "MULTIPART_ERROR");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
 
     /**
      * Handle custom business exceptions

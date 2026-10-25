@@ -1,6 +1,8 @@
 package com.tlcn.vendor_service.service;
 
+import com.tlcn.vendor_service.client.AdminServiceClient;
 import com.tlcn.vendor_service.dto.ResponseDTO;
+import com.tlcn.vendor_service.dto.VendorResponse;
 import com.tlcn.vendor_service.enums.VendorStatus;
 import com.tlcn.vendor_service.model.Vendor;
 import com.tlcn.vendor_service.repository.VendorRepository;
@@ -43,27 +45,27 @@ public class AdminVendorService {
             vendors = vendorRepository.findAll(pageable);
         }
 
-        return new ResponseDTO<>(true, "Vendor list loaded", vendors);
+        return new ResponseDTO<>(true, "Vendor list loaded", vendors.map(VendorResponse::fromEntity));
     }
 
     /**
      * Lấy vendor theo ID (admin)
      */
-    public ResponseDTO<Vendor> getVendorById(Long id) {
+    public ResponseDTO<VendorResponse> getVendorById(Long id) {
         Optional<Vendor> vendorOpt = vendorRepository.findById(id);
 
         if (vendorOpt.isEmpty()) {
             return new ResponseDTO<>(false, "Vendor not found", null);
         }
 
-        return new ResponseDTO<>(true, "Vendor found", vendorOpt.get());
+        return new ResponseDTO<>(true, "Vendor found", VendorResponse.fromEntity(vendorOpt.get()));
     }
 
     /**
      * Admin thay đổi trạng thái vendor - FIXED: Added status transition validation
      */
     @Transactional
-    public ResponseDTO<Vendor> updateVendorStatus(Long id, VendorStatus newStatus) {
+    public ResponseDTO<VendorResponse> updateVendorStatus(Long id, VendorStatus newStatus) {
         Optional<Vendor> vendorOpt = vendorRepository.findById(id);
 
         if (vendorOpt.isEmpty()) {
@@ -100,14 +102,14 @@ public class AdminVendorService {
             null  // userAgent - will be extracted from request in admin-service
         );
 
-        return new ResponseDTO<>(true, "Vendor status updated", vendor);
+        return new ResponseDTO<>(true, "Vendor status updated", VendorResponse.fromEntity(vendor));
     }
 
     /**
      * Admin cập nhật thông tin vendor - FIXED: Added email/username uniqueness
      */
     @Transactional
-    public ResponseDTO<Vendor> updateVendorInfo(Long id, Vendor request) {
+    public ResponseDTO<VendorResponse> updateVendorInfo(Long id, Vendor request) {
         Optional<Vendor> vendorOpt = vendorRepository.findById(id);
 
         if (vendorOpt.isEmpty()) {
@@ -139,8 +141,6 @@ public class AdminVendorService {
         if (request.getLastName() != null) vendor.setLastName(request.getLastName());
         if (request.getShopName() != null) vendor.setShopName(request.getShopName());
         if (request.getPhone() != null) vendor.setPhone(request.getPhone());
-        if (request.getBankAccount() != null) vendor.setBankAccount(request.getBankAccount());
-        if (request.getPaymentInfo() != null) vendor.setPaymentInfo(request.getPaymentInfo());
 
         vendor.setUpdatedAt(java.time.LocalDateTime.now());
         vendorRepository.save(vendor);
@@ -161,7 +161,7 @@ public class AdminVendorService {
             null  // userAgent - will be extracted from request in admin-service
         );
 
-        return new ResponseDTO<>(true, "Vendor info updated", vendor);
+        return new ResponseDTO<>(true, "Vendor info updated", VendorResponse.fromEntity(vendor));
     }
 
     /**

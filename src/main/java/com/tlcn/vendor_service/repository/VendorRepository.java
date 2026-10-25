@@ -6,8 +6,12 @@ import com.tlcn.vendor_service.model.Vendor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -21,4 +25,14 @@ public interface VendorRepository extends JpaRepository<Vendor, Long> {
     Page<Vendor> findByStatus(VendorStatus status, Pageable pageable);
     Page<Vendor> findByUsernameContainingIgnoreCase(String username, Pageable pageable);
     Page<Vendor> findByStatusAndUsernameContainingIgnoreCase(VendorStatus status, String username, Pageable pageable);
+
+    Optional<Vendor> findByKeycloakIdAndStatus(String keycloakId, VendorStatus status);
+
+    Page<Vendor> findByStatusAndShopNameContainingIgnoreCase(VendorStatus status, String shopName, Pageable pageable);
+
+    List<Vendor> findByKeycloakIdInAndStatus(Collection<String> keycloakIds, VendorStatus status);
+
+    // Used for broadcast notification fan-out (communication-service)
+    @Query("SELECT v.keycloakId FROM Vendor v WHERE v.status = :status AND v.keycloakId IS NOT NULL")
+    List<String> findKeycloakIdByStatus(@Param("status") VendorStatus status);
 }

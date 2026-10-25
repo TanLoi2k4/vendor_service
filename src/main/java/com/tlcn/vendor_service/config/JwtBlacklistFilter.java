@@ -18,7 +18,8 @@ import java.io.IOException;
 @Slf4j
 public class JwtBlacklistFilter extends OncePerRequestFilter {
 
-    private static final String BLACKLIST_KEY_PREFIX = "vendor:token:blacklist:";
+    private static final String UNIFIED_BLACKLIST_KEY_PREFIX = "token:blacklist:";
+    private static final String LEGACY_BLACKLIST_KEY_PREFIX = "vendor:token:blacklist:";
     private final RedisTemplate<String, String> redisTemplate;
 
     public JwtBlacklistFilter(RedisTemplate<String, String> redisTemplate) {
@@ -35,10 +36,11 @@ public class JwtBlacklistFilter extends OncePerRequestFilter {
             
             // Hash token for security (don't use raw token as Redis key)
             String tokenHash = DigestUtils.sha256Hex(accessToken);
-            String blacklistKey = BLACKLIST_KEY_PREFIX + tokenHash;
+            String unifiedKey = UNIFIED_BLACKLIST_KEY_PREFIX + tokenHash;
+            String legacyKey = LEGACY_BLACKLIST_KEY_PREFIX + tokenHash;
             
             // Check if token is blacklisted
-            if (redisTemplate.hasKey(blacklistKey)) {
+            if (redisTemplate.hasKey(unifiedKey) || redisTemplate.hasKey(legacyKey)) {
                 log.warn("Attempt to use blacklisted token: {}...", accessToken.substring(0, Math.min(20, accessToken.length())));
                 
                 // Set proper response headers

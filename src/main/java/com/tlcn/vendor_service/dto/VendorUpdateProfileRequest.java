@@ -17,10 +17,4 @@ public class VendorUpdateProfileRequest {
 
     @Pattern(regexp = "^\\d{10}$", message = "Phone must be 10 digits")
     private String phone;
-
-    @Size(max = 50, message = "Bank account must not exceed 50 characters")
-    private String bankAccount;
-
-    @Size(max = 100, message = "Payment info must not exceed 100 characters")
-    private String paymentInfo;
 }

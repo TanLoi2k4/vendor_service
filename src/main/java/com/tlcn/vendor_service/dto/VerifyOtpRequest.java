@@ -18,5 +18,5 @@ public class VerifyOtpRequest {
     @NotBlank
     private String initToken;
 
-    private boolean autoRegister = false;
+    private boolean autoRegister = true;
 }

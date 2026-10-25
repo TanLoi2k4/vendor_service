@@ -37,11 +37,14 @@ public class SecurityConfig {
                 // Public Endpoints (Order is important here: specific to general)
                 .requestMatchers(
                     "/vendors/register-init",
+                    "/vendors/verify-otp",
                     "/vendors/verify-otp/**",
-                    "/vendors/resend-otp",
                     "/vendors/forget-password/**",
                     "/vendors/reset-password",
                     "/vendors/login",
+                    "/vendors/refresh",
+                    "/vendors/public",
+                    "/vendors/public/**",
                     "/actuator/**"
                 ).permitAll()
                 
@@ -54,15 +57,25 @@ public class SecurityConfig {
             )
             
             .oauth2ResourceServer(oauth2 -> oauth2
-            .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
-            .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-        )
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .exceptionHandling(exceptions -> exceptions
-            .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-        )
-        .addFilterBefore(new JwtBlacklistFilter(redisTemplate), BasicAuthenticationFilter.class);
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter))
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
 
-    return http.build();
+            )
+            
+            // 5. Set session management to stateless (Crucial for JWT/REST API)
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            
+            // 6. CRITICAL FIX: Handle exceptions to return 401 JSON instead of searching for a static page
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+            )
+            
+            // 7. Add custom JWT blacklist filter
+            .addFilterBefore(new JwtBlacklistFilter(redisTemplate), BasicAuthenticationFilter.class);
+    
+    
+        return http.build();
     }
 }

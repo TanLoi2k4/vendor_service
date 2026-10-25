@@ -140,7 +140,7 @@ public class EmailService {
      */
     public void sendPasswordResetEmail(String to, String vendorName, String resetToken) {
         String subject = "Password Reset Request";
-        String resetLink = "http://localhost:3000/vendor/reset-password?token=" + resetToken; // Frontend URL
+        String resetLink = "http://localhost:5174/reset-password?token=" + resetToken;
         String content = String.format(
             "Dear %s,\n\n" +
             "You have requested to reset your password.\n\n" +

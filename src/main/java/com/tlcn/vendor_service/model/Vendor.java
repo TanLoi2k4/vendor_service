@@ -1,5 +1,6 @@
 package com.tlcn.vendor_service.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.tlcn.vendor_service.enums.VendorStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -66,17 +67,29 @@ public class Vendor {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(updatable = true)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
-    @Size(max = 50, message = "Bank account must not exceed 50 characters")
-    @Column(length = 50)
-    private String bankAccount;
-
-    @Size(max = 100, message = "Payment info must not exceed 100 characters")
-    @Column(length = 100)
-    private String paymentInfo;
+    @JsonIgnore
+    @OneToOne(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private VendorBankAccount bankAccount;
 
     @Size(max = 255, message = "Keycloak ID must not exceed 255 characters")
     @Column(length = 255)
-    private String keycloakId; 
+    private String keycloakId;
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

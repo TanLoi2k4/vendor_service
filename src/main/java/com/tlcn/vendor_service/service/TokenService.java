@@ -16,7 +16,8 @@ import java.time.Duration;
 @Slf4j
 public class TokenService {
 
-    private static final String BLACKLIST_KEY_PREFIX = "vendor:token:blacklist:";
+    private static final String UNIFIED_BLACKLIST_KEY_PREFIX = "token:blacklist:";
+    private static final String LEGACY_BLACKLIST_KEY_PREFIX = "vendor:token:blacklist:";
     private static final String RESET_TOKEN_PREFIX = "vendor:reset:";
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -29,10 +30,12 @@ public class TokenService {
     public void blacklistToken(String token, long expirationTimeSeconds) {
         // Hash token for security
         String tokenHash = DigestUtils.sha256Hex(token);
-        String blacklistKey = BLACKLIST_KEY_PREFIX + tokenHash;
+        String unifiedKey = UNIFIED_BLACKLIST_KEY_PREFIX + tokenHash;
+        String legacyKey = LEGACY_BLACKLIST_KEY_PREFIX + tokenHash;
 
         // Store in Redis with expiration
-        redisTemplate.opsForValue().set(blacklistKey, "blacklisted", Duration.ofSeconds(expirationTimeSeconds));
+        redisTemplate.opsForValue().set(unifiedKey, "blacklisted", Duration.ofSeconds(expirationTimeSeconds));
+        redisTemplate.opsForValue().set(legacyKey, "blacklisted", Duration.ofSeconds(expirationTimeSeconds));
 
         log.info("Token blacklisted successfully. Hash: {}", tokenHash);
     }
@@ -44,8 +47,9 @@ public class TokenService {
      */
     public boolean isTokenBlacklisted(String token) {
         String tokenHash = DigestUtils.sha256Hex(token);
-        String blacklistKey = BLACKLIST_KEY_PREFIX + tokenHash;
-        return redisTemplate.hasKey(blacklistKey);
+        String unifiedKey = UNIFIED_BLACKLIST_KEY_PREFIX + tokenHash;
+        String legacyKey = LEGACY_BLACKLIST_KEY_PREFIX + tokenHash;
+        return redisTemplate.hasKey(unifiedKey) || redisTemplate.hasKey(legacyKey);
     }
 
     /**

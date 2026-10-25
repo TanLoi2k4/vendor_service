@@ -194,6 +194,44 @@ public class KeycloakService {
         }
     }
 
+    public AccessTokenResponse refreshToken(String refreshToken) {
+        log.debug("Refreshing access token");
+        try {
+            Client client = ClientBuilder.newClient();
+            String tokenUrl = serverUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+
+            Form form = new Form();
+            form.param("client_id", clientId);
+            form.param("client_secret", clientSecret);
+            form.param("grant_type", "refresh_token");
+            form.param("refresh_token", refreshToken);
+
+            Response response = client.target(tokenUrl)
+                    .request()
+                    .post(Entity.form(form));
+
+            if (response.getStatus() != 200) {
+                String errorMessage = response.readEntity(String.class);
+                log.error("Failed to refresh token: status={}, message={}", response.getStatus(), errorMessage);
+                throw new KeycloakException("Refresh token failed: " + errorMessage);
+            }
+
+            AccessTokenResponse tokenResponse = response.readEntity(AccessTokenResponse.class);
+            if (tokenResponse == null || tokenResponse.getToken() == null) {
+                throw new KeycloakException("Empty token response from Keycloak");
+            }
+
+            log.info("Access token refreshed successfully");
+            client.close();
+            return tokenResponse;
+        } catch (KeycloakException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Refresh token failed: error={}", e.getMessage());
+            throw new KeycloakException("Refresh token failed: " + e.getMessage());
+        }
+    }
+
     public void logoutUser(String accessToken, String refreshToken) {
         // For consistency with CustomerService, but only refreshToken is actually used
         logoutUser(refreshToken);

@@ -80,7 +80,8 @@ public class VendorService {
     private String keyVerify(String email) { return "vendor:verify:" + email; } 
     private String keySession(String sessionId) { return "vendor:session:" + sessionId; }
     private String keyAccessMap(String accessTokenHash) { return "vendor:access:map:" + accessTokenHash; } 
-    private String keyBlacklist(String accessTokenHash) { return "vendor:token:blacklist:" + accessTokenHash; }
+    private String keyBlacklist(String accessTokenHash) { return "token:blacklist:" + accessTokenHash; }
+    private String keyBlacklistLegacy(String accessTokenHash) { return "vendor:token:blacklist:" + accessTokenHash; }
 
     // reset password keys
     private String keyResetOtpMap(String otp) { return "vendor:reset:otp-map:" + otp; } 
@@ -289,10 +290,10 @@ public class VendorService {
             vendor.setLastName(request.getLastName());
             vendor.setShopName(request.getShopName());
             vendor.setPhone(request.getPhone());
-            vendor.setBankAccount(request.getBankAccount());
-            vendor.setPaymentInfo(request.getPaymentInfo());
             vendor.setStatus(VendorStatus.ACTIVE);
-            vendor.setCreatedAt(LocalDateTime.now());
+            LocalDateTime now = LocalDateTime.now();
+            vendor.setCreatedAt(now);
+            vendor.setUpdatedAt(now);
             vendor.setKeycloakId(keycloakId);
             if (logoPublicId != null) {
                 vendor.setLogoPublicId(logoPublicId);
@@ -376,6 +377,54 @@ public class VendorService {
         } catch (Exception e) {
             log.warn("Login failed for username: {}, error: {}", username, e.getMessage());
             throw new BusinessException("Invalid username or password");
+        }
+    }
+
+    /**
+     * Làm mới access token bằng refresh token (Keycloak grant_type=refresh_token).
+     */
+    public LoginResponse refresh(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException("Refresh token is required");
+        }
+
+        try {
+            AccessTokenResponse token = keycloakService.refreshToken(refreshToken);
+            String keycloakId = extractKeycloakSub(token.getToken());
+            Vendor vendor = vendorRepository.findByKeycloakId(keycloakId)
+                    .orElseThrow(() -> new BusinessException("Vendor not found"));
+
+            if (vendor.getStatus() != VendorStatus.ACTIVE) {
+                throw new BusinessException("Account is " + vendor.getStatus().name().toLowerCase() + ". Contact support.");
+            }
+
+            String sessionId = UUID.randomUUID().toString();
+            String sessionKey = keySession(sessionId);
+
+            Map<String, String> sessionData = new HashMap<>();
+            sessionData.put("keycloakId", vendor.getKeycloakId());
+            sessionData.put("username", vendor.getUsername());
+
+            long expirationSeconds = token.getExpiresIn() > 0 ? token.getExpiresIn() : 300L;
+            redisTemplate.opsForHash().putAll(sessionKey, sessionData);
+            redisTemplate.expire(sessionKey, expirationSeconds, TimeUnit.SECONDS);
+
+            String hashedToken = hashToken(token.getToken());
+            redisTemplate.opsForValue().set(keyAccessMap(hashedToken), sessionId, expirationSeconds, TimeUnit.SECONDS);
+
+            log.info("Token refreshed: username={}", vendor.getUsername());
+            return LoginResponse.builder()
+                    .accessToken(token.getToken())
+                    .refreshToken(token.getRefreshToken())
+                    .tokenType(token.getTokenType())
+                    .expiresIn(token.getExpiresIn())
+                    .scope(token.getScope())
+                    .build();
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Refresh failed: {}", e.getMessage());
+            throw new BusinessException("Invalid or expired refresh token");
         }
     }
 
@@ -524,8 +573,6 @@ public class VendorService {
         if (request.getLastName() != null) vendor.setLastName(request.getLastName());
         if (request.getShopName() != null) vendor.setShopName(request.getShopName());
         if (request.getPhone() != null) vendor.setPhone(request.getPhone());
-        if (request.getBankAccount() != null) vendor.setBankAccount(request.getBankAccount());
-        if (request.getPaymentInfo() != null) vendor.setPaymentInfo(request.getPaymentInfo());
 
         if (logo != null && !logo.isEmpty()) {
             validateLogo(logo);
@@ -610,6 +657,28 @@ public class VendorService {
                     return new BusinessException("Vendor not found");
                 });
         return vendor;
+    }
+
+    /** Lấy claim `sub` (keycloakId) từ JWT access token */
+    private String extractKeycloakSub(String jwt) {
+        try {
+            String[] parts = jwt.split("\\.");
+            if (parts.length < 2) {
+                throw new BusinessException("Invalid access token");
+            }
+            String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payload = objectMapper.readValue(payloadJson, Map.class);
+            Object sub = payload.get("sub");
+            if (sub == null || sub.toString().isBlank()) {
+                throw new BusinessException("Invalid access token: missing sub");
+            }
+            return sub.toString();
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException("Invalid access token");
+        }
     }
 
     // ---------- Token utilities ----------

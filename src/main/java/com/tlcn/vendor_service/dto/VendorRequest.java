@@ -39,12 +39,4 @@ public class VendorRequest {
     @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d@$!%*#?&]{8,}$", 
              message = "Password must contain at least one letter and one number")
     private String password;
-
-    @NotBlank(message = "Bank account is required") 
-    @Size(max = 50, message = "Bank account must not exceed 50 characters")
-    private String bankAccount;
-
-    @NotBlank(message = "Payment info is required")  
-    @Size(max = 100, message = "Payment info must not exceed 100 characters")
-    private String paymentInfo;
 }

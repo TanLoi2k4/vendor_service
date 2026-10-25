@@ -21,15 +21,15 @@ public class VendorController {
 
     @PostMapping(value = "/register-init", consumes = "multipart/form-data")
     public ResponseEntity<ResponseDTO<String>> registerInit(
-            @RequestPart("request") VendorRequest request,
-            @RequestPart(required = false) MultipartFile logo
+            @Valid @RequestPart("request") VendorRequest request,
+            @RequestPart(value = "logo",required = false) MultipartFile logo
     ) {
         String initToken = vendorService.registerInit(request, logo);
         return ResponseEntity.ok(new ResponseDTO<>(true, "Registration initialized", initToken));
     }
 
     @PostMapping("/verify-otp/resend-otp")
-    public ResponseEntity<ResponseDTO<Void>> resendOtp(@RequestBody ResendOtpRequest request) {
+    public ResponseEntity<ResponseDTO<Void>> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
         vendorService.resendOtp(request.getEmail(), request.getInitToken());
         return ResponseEntity.ok(new ResponseDTO<>(true, "OTP resent", null));
     }
@@ -43,7 +43,7 @@ public class VendorController {
                 request.isAutoRegister()
         );
         if (result instanceof Vendor vendor) {
-            return ResponseEntity.ok(new ResponseDTO<>(true, "Registered successfully", vendor));
+            return ResponseEntity.ok(new ResponseDTO<>(true, "Registered successfully", VendorResponse.fromEntity(vendor)));
         } else {
             return ResponseEntity.ok(new ResponseDTO<>(true, "OTP verified", result));
         }
@@ -53,6 +53,12 @@ public class VendorController {
     public ResponseEntity<ResponseDTO<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse token = vendorService.login(request.getUsername(), request.getPassword());
         return ResponseEntity.ok(new ResponseDTO<>(true, "Login successful", token));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ResponseDTO<LoginResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        LoginResponse token = vendorService.refresh(request.getRefreshToken());
+        return ResponseEntity.ok(new ResponseDTO<>(true, "Token refreshed", token));
     }
 
     @PostMapping("/forget-password")
@@ -69,33 +75,33 @@ public class VendorController {
 
     @PutMapping(value = "/profile", consumes = "multipart/form-data")
     @PreAuthorize("hasRole('VENDOR')")
-    public ResponseEntity<ResponseDTO<Vendor>> updateProfile(
+    public ResponseEntity<ResponseDTO<VendorResponse>> updateProfile(
             @RequestPart("request") VendorUpdateProfileRequest request,
             @RequestPart(value = "logo", required = false) MultipartFile logo,
             Authentication authentication
     ) {
         String keycloakId = authentication.getName();
         Vendor updated = vendorService.updateProfile(keycloakId, request, logo);
-        return ResponseEntity.ok(new ResponseDTO<>(true, "Profile updated", updated));
+        return ResponseEntity.ok(new ResponseDTO<>(true, "Profile updated", VendorResponse.fromEntity(updated)));
     }
 
     @PutMapping("/account")
     @PreAuthorize("hasRole('VENDOR')")
-    public ResponseEntity<ResponseDTO<Vendor>> updateAccount(
+    public ResponseEntity<ResponseDTO<VendorResponse>> updateAccount(
             @Valid @RequestBody VendorUpdateAccountRequest request,
             Authentication authentication
     ) {
         String keycloakId = authentication.getName();
         Vendor updated = vendorService.updateAccount(keycloakId, request);
-        return ResponseEntity.ok(new ResponseDTO<>(true, "Account updated", updated));
+        return ResponseEntity.ok(new ResponseDTO<>(true, "Account updated", VendorResponse.fromEntity(updated)));
     }
 
     @GetMapping
     @PreAuthorize("hasRole('VENDOR')")
-    public ResponseEntity<ResponseDTO<Vendor>> getVendorByKeycloakId(Authentication authentication) {
-        String keycloakId = authentication.getName(); 
+    public ResponseEntity<ResponseDTO<VendorResponse>> getVendorByKeycloakId(Authentication authentication) {
+        String keycloakId = authentication.getName();
         Vendor vendor = vendorService.getVendorByKeycloakId(keycloakId);
-        return ResponseEntity.ok(new ResponseDTO<>(true, "Vendor retrieved", vendor));
+        return ResponseEntity.ok(new ResponseDTO<>(true, "Vendor retrieved", VendorResponse.fromEntity(vendor)));
     }
 
     @PostMapping("/logout")
